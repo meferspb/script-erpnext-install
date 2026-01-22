@@ -115,11 +115,11 @@ verify_versions() {
     if [[ "$LANG" == "ru" ]]; then
         log "Проверка установленных версий..."
         python_err="Требуется Python 3.10+"
-        node_err="Требуется Node.js 18+"
+        node_err="Требуется Node.js 22+"
     else
         log "Verifying installed versions..."
         python_err="Python 3.10+ required"
-        node_err="Node.js 18+ required"
+        node_err="Node.js 22+ required"
     fi
 
     # Python version check
@@ -142,7 +142,7 @@ PY
         error "$node_err: node not found"
     fi
     node_version=$(node -v 2>/dev/null | sed 's/^v//')
-    if ! node -e 'const v=process.versions.node.split("."); if(+v[0]>18 || (+v[0]==18 && +v[1]>=0)) process.exit(0); else process.exit(1);' 2>/dev/null; then
+    if ! node -e 'const v=process.versions.node.split("."); if(+v[0]>22 || (+v[0]==22 && +v[1]>=0)) process.exit(0); else process.exit(1);' 2>/dev/null; then
         error "$node_err: $node_version"
     fi
     log "Node.js version: $node_version ✓"
@@ -348,10 +348,10 @@ install_system_deps() {
     # Install all packages
     sudo $INSTALL_CMD $common_packages $os_packages
 
-    # Install Node.js 18+ and Yarn
+    # Install Node.js 22+ and Yarn
     case $OS_FAMILY in
         debian)
-            curl -fsSL https://deb.nodesource.com/setup_2.x | sudo -E bash -
+            curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
             sudo $INSTALL_CMD nodejs
             # Add Yarn GPG key without using deprecated apt-key
             if ! command -v gpg >/dev/null 2>&1; then
@@ -362,7 +362,7 @@ install_system_deps() {
             sudo $INSTALL_CMD yarn || true
             ;;
         rhel)
-            curl -fsSL https://rpm.nodesource.com/setup_24.x | sudo -E bash -
+            curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo -E bash -
             sudo $INSTALL_CMD nodejs
             curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | sudo tee /etc/yum.repos.d/yarn.repo
             sudo $INSTALL_CMD yarn
