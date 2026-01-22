@@ -155,9 +155,14 @@ PY
 }
 
 # Helper to execute MySQL/MariaDB SQL safely
-# Tries: 1) sudo mysql -e "SQL"  2) sudo mysql --defaults-file=/etc/mysql/debian.cnf -e "SQL"
+# Tries: 1) sudo mysql -u root -p"$DB_ROOT_PASSWORD" -e "SQL"  2) sudo mysql -e "SQL"  3) sudo mysql --defaults-file=/etc/mysql/debian.cnf -e "SQL"
 run_mysql() {
     local sql="$1"
+    if [[ -n "$DB_ROOT_PASSWORD" ]]; then
+        if sudo mysql -u root -p"$DB_ROOT_PASSWORD" -e "$sql" >/dev/null 2>&1; then
+            return 0
+        fi
+    fi
     if sudo mysql -e "$sql" >/dev/null 2>&1; then
         return 0
     fi
