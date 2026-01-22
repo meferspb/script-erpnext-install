@@ -154,6 +154,21 @@ PY
     fi
 }
 
+# Helper to execute MySQL/MariaDB SQL safely
+# Tries: 1) sudo mysql -e "SQL"  2) sudo mysql --defaults-file=/etc/mysql/debian.cnf -e "SQL"
+run_mysql() {
+    local sql="$1"
+    if sudo mysql -e "$sql" >/dev/null 2>&1; then
+        return 0
+    fi
+    if [[ -f /etc/mysql/debian.cnf ]]; then
+        if sudo mysql --defaults-file=/etc/mysql/debian.cnf -e "$sql" >/dev/null 2>&1; then
+            return 0
+        fi
+    fi
+    return 1
+}
+
 # Detect OS and set package manager
 # Определить ОС и установить менеджер пакетов
 detect_os() {
@@ -432,21 +447,19 @@ configure_mariadb() {
     # Wait for MariaDB to start
     sleep 5
 
-    # Secure MariaDB installation manually (run as root via sudo so no password on CLI)
-    sudo mysql <<EOF
-ALTER USER 'root'@'localhost' IDENTIFIED BY '${DB_ROOT_PASSWORD}';
-DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
-DELETE FROM mysql.user WHERE User='';
-DELETE FROM mysql.db WHERE Db='test' OR Db='test_%';
-FLUSH PRIVILEGES;
-EOF
+    # Secure MariaDB installation manually (try multiple auth methods)
+    if run_mysql "ALTER USER 'root'@'localhost' IDENTIFIED BY '${DB_ROOT_PASSWORD}'; DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1'); DELETE FROM mysql.user WHERE User=''; DELETE FROM mysql.db WHERE Db='test' OR Db LIKE 'test_%'; FLUSH PRIVILEGES;"; then
+        log "MariaDB: root user configured"
+    else
+        warning "Could not run SQL as root without password. You may need to set root password manually or check MariaDB auth settings."
+    fi
 
     # Create frappe database user
-    sudo mysql <<EOF
-CREATE USER IF NOT EXISTS 'frappe'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';
-GRANT ALL PRIVILEGES ON *.* TO 'frappe'@'localhost' WITH GRANT OPTION;
-FLUSH PRIVILEGES;
-EOF
+    if run_mysql "CREATE USER IF NOT EXISTS 'frappe'@'localhost' IDENTIFIED BY '${DB_PASSWORD}'; GRANT ALL PRIVILEGES ON *.* TO 'frappe'@'localhost' WITH GRANT OPTION; FLUSH PRIVILEGES;"; then
+        log "MariaDB: frappe user ensured"
+    else
+        error "Failed to create 'frappe' database user. Please verify MariaDB root access."
+    fi
 
     success "$success_msg"
 }
