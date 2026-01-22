@@ -294,6 +294,63 @@ install_system_deps() {
     success "$success_msg"
 }
 
+# Configure security: install and enable fail2ban and ensure firewall keeps ports 22,80,443 open
+# Настройка безопасности: fail2ban и брандмауэр — порты 22,80,443 всегда открыты
+configure_security() {
+    if [[ "$LANG" == "ru" ]]; then
+        log "Настройка безопасности: fail2ban и брандмауэр..."
+        success_msg="Fail2ban и брандмауэр настроены"
+    else
+        log "Configuring security: fail2ban and firewall..."
+        success_msg="Fail2ban and firewall configured"
+    fi
+
+    case $OS_FAMILY in
+        debian)
+            sudo $INSTALL_CMD fail2ban ufw || true
+
+            # fail2ban basic local configuration (idempotent)
+            sudo mkdir -p /etc/fail2ban/jail.d
+            sudo tee /etc/fail2ban/jail.d/erpnext.local > /dev/null <<'EOF'
+[DEFAULT]
+ignoreip = 127.0.0.1/8 ::1
+bantime = 3600
+findtime = 600
+maxretry = 5
+
+[sshd]
+enabled = true
+port = ssh
+filter = sshd
+logpath = /var/log/auth.log
+EOF
+
+            sudo systemctl enable --now fail2ban || true
+
+            # Ensure UFW is present and allow required ports (idempotent)
+            if command -v ufw >/dev/null 2>&1; then
+                sudo ufw allow 22/tcp
+                sudo ufw allow 80/tcp
+                sudo ufw allow 443/tcp
+                sudo ufw default deny incoming
+                sudo ufw default allow outgoing
+                sudo ufw --force enable
+            fi
+            ;;
+        rhel)
+            sudo $INSTALL_CMD fail2ban firewalld || true
+            sudo systemctl enable --now fail2ban || true
+            sudo systemctl enable --now firewalld || true
+            sudo firewall-cmd --permanent --add-service=ssh || true
+            sudo firewall-cmd --permanent --add-service=http || true
+            sudo firewall-cmd --permanent --add-service=https || true
+            sudo firewall-cmd --reload || true
+            ;;
+    esac
+
+    success "$success_msg"
+}
+
 # Configure MariaDB
 # Настроить MariaDB
 configure_mariadb() {
@@ -541,6 +598,7 @@ main() {
     check_existing_installation
     detect_os
     install_system_deps
+    configure_security
     configure_mariadb
     create_frappe_user
     install_bench
