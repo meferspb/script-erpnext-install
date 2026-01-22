@@ -81,15 +81,27 @@ install_wkhtmltopdf() {
 
     case $OS_FAMILY in
         debian)
-            # Try snap first (works on most Debian versions)
-            if command -v snap &> /dev/null; then
-                sudo snap install wkhtmltopdf
-            else
-                # Fallback: download from GitHub releases
+            # Try to install from Debian backports first
+            if apt-cache policy wkhtmltopdf 2>/dev/null | grep -q "Candidate:"; then
+                sudo $INSTALL_CMD wkhtmltopdf || true
+            fi
+
+            # If not available in repos, try snap
+            if ! command -v wkhtmltopdf &> /dev/null && command -v snap &> /dev/null; then
+                sudo snap install wkhtmltopdf || true
+            fi
+
+            # Last resort: manual installation with cleanup
+            if ! command -v wkhtmltopdf &> /dev/null; then
                 wget -q https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-2/wkhtmltox_0.12.6.1-2.jammy_amd64.deb
                 sudo dpkg -i wkhtmltox_0.12.6.1-2.jammy_amd64.deb || true
-                sudo apt install -f -y
-                rm wkhtmltox_0.12.6.1-2.jammy_amd64.deb
+                sudo apt install -f -y || true
+                rm -f wkhtmltox_0.12.6.1-2.jammy_amd64.deb
+
+                # Mark as auto-installed to prevent apt issues
+                if command -v wkhtmltopdf &> /dev/null; then
+                    echo "wkhtmltox install ok installed" | sudo dpkg --set-selections || true
+                fi
             fi
             ;;
         rhel)
