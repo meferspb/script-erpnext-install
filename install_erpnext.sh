@@ -440,9 +440,44 @@ configure_mariadb() {
         success_msg="MariaDB configured"
     fi
 
+    # If MariaDB/MySQL already installed, purge it (packages + data) to ensure clean reinstall
+    if command -v mysql >/dev/null 2>&1 || systemctl list-units --type=service | grep -Eq 'mariadb|mysql'; then
+        if [[ "$LANG" == "ru" ]]; then
+            log "Найдена существующая установка MariaDB/MySQL — удаляю (purge) и очищаю данные..."
+        else
+            log "Existing MariaDB/MySQL detected — purging and removing data..."
+        fi
+
+        case $OS_FAMILY in
+            debian)
+                sudo systemctl stop mariadb || sudo systemctl stop mysql || true
+                sudo $INSTALL_CMD --purge -y mariadb-server mariadb-client mariadb-common mariadb-server-core-* mariadb-client-core-* mysql-server mysql-client mysql-common || true
+                sudo apt autoremove -y || true
+                ;;
+            rhel)
+                sudo systemctl stop mariadb || sudo systemctl stop mysql || true
+                sudo $INSTALL_CMD remove -y mariadb-server mariadb mariadb-client mysql-server mysql || true
+                sudo $INSTALL_CMD autoremove -y || true
+                ;;
+        esac
+
+        sudo rm -rf /var/lib/mysql /etc/mysql /var/log/mysql /var/log/mysql.* /var/run/mysqld 2>/dev/null || true
+        sudo deluser --remove-home mysql 2>/dev/null || true
+        sudo groupdel mysql 2>/dev/null || true
+
+        if [[ "$LANG" == "ru" ]]; then
+            log "Старая установка MariaDB удалена. Продолжаю чистую установку."
+        else
+            log "Old MariaDB installation removed. Proceeding with fresh install."
+        fi
+    fi
+
+    # Install MariaDB server fresh
+    sudo $INSTALL_CMD mariadb-server || true
+
     # Start and enable MariaDB
-    sudo systemctl start mariadb
-    sudo systemctl enable mariadb
+    sudo systemctl start mariadb || sudo systemctl start mysql || true
+    sudo systemctl enable mariadb || sudo systemctl enable mysql || true
 
     # Wait for MariaDB to start
     sleep 5
