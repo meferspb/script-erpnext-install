@@ -272,7 +272,7 @@ install_system_deps() {
     fi
 
     # Common packages
-    local common_packages="git curl wget python3 python3-pip python3-dev python3-setuptools python3-venv redis-server mariadb-server nginx supervisor build-essential libssl-dev libffi-dev bc bmon mc htop vim nano screen rsync unzip"
+    local common_packages="git curl wget python3 python3-pip python3-dev python3-setuptools python3-venv redis-server mariadb-server nginx supervisor cron build-essential libssl-dev libffi-dev bc bmon mc htop vim nano screen rsync unzip"
 
     # OS-specific packages — handle missing packages on newer distributions
     # Run update first so package availability info is fresh
