@@ -614,7 +614,14 @@ install_erpnext() {
     sudo systemctl restart redis-server || true
     sleep 2
 
-    sudo -u frappe bash -c "cd '$INSTALL_PATH/frappe-bench' && bench setup production frappe"
+    # Run bench setup production with error handling to prevent script exit
+    if sudo -u frappe bash -c "cd '$INSTALL_PATH/frappe-bench' && bench setup production frappe"; then
+        log "Bench production setup completed successfully"
+    else
+        warning "Bench production setup encountered issues. Services may need manual configuration."
+        warning "You can try running: sudo -u frappe bench setup production frappe"
+        warning "Or manually configure services with: sudo supervisorctl reread && sudo supervisorctl update"
+    fi
 
     success "$success_msg"
 }
