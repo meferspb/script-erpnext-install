@@ -601,6 +601,82 @@ install_erpnext() {
     success "$success_msg"
 }
 
+# Configure Nginx
+# Настроить Nginx
+configure_nginx() {
+    if [[ "$LANG" == "ru" ]]; then
+        log "Настройка Nginx для ERPNext..."
+        success_msg="Nginx настроен"
+    else
+        log "Configuring Nginx for ERPNext..."
+        success_msg="Nginx configured"
+    fi
+
+    # Create nginx site configuration
+    sudo tee /etc/nginx/sites-available/$DEFAULT_SITE_NAME >/dev/null <<EOF
+server {
+    listen 80;
+    server_name $DEFAULT_SITE_NAME;
+
+    root $INSTALL_PATH/frappe-bench/sites;
+
+    add_header X-Frame-Options "SAMEORIGIN";
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload";
+    add_header X-Content-Type-Options nosniff;
+    add_header X-XSS-Protection "1; mode=block";
+
+    index index.php index.html index.htm;
+
+    location /assets {
+        access_log off;
+        expires 1M;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location ~* /(app|api|files|private) {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+    }
+
+    location / {
+        try_files \$uri \$uri/ =404;
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    error_page 404 /404.html;
+    location = /40x.html {
+    }
+
+    error_page 500 502 503 504 /50x.html;
+    location = /50x.html {
+    }
+}
+EOF
+
+    # Enable the site
+    sudo ln -sf /etc/nginx/sites-available/$DEFAULT_SITE_NAME /etc/nginx/sites-enabled/
+    sudo rm -f /etc/nginx/sites-enabled/default
+
+    # Test nginx configuration
+    if sudo nginx -t; then
+        log "Nginx configuration is valid"
+    else
+        error "Nginx configuration is invalid"
+    fi
+
+    success "$success_msg"
+}
+
 # Configure Nginx and Supervisor
 # Настроить Nginx и Supervisor
 configure_services() {
@@ -611,6 +687,9 @@ configure_services() {
         log "Configuring Nginx and Supervisor..."
         success_msg="Services configured"
     fi
+
+    # Configure Nginx
+    configure_nginx
 
     # Enable and start services
     sudo systemctl enable nginx
