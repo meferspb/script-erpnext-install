@@ -550,8 +550,7 @@ create_frappe_user() {
     sudo chown -R frappe:frappe "$INSTALL_PATH"
 
     # Configure Git for frappe user
-    sudo -u frappe git config --global user.name "$GIT_USER_NAME"
-    sudo -u frappe git config --global user.email "$GIT_USER_EMAIL"
+    sudo -u frappe bash -c "cd /home/frappe && git config --global user.name '$GIT_USER_NAME' && git config --global user.email '$GIT_USER_EMAIL'"
 
     success "$success_msg"
 }
