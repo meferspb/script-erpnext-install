@@ -696,6 +696,11 @@ configure_services() {
     sudo systemctl enable supervisor
     sudo systemctl enable redis-server
 
+    # Start services
+    sudo systemctl start nginx || true
+    sudo systemctl start supervisor || true
+    sudo systemctl start redis-server || true
+
     # Reload services
     sudo systemctl reload nginx
     sudo supervisorctl reread
