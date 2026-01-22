@@ -34,8 +34,81 @@ GIT_USER_NAME=""
 GIT_USER_EMAIL=""
 LANG="en"  # Default language: en or ru
 
-# Function to log messages
-# Функция для логирования сообщений
+# Enhanced logging functions with detailed information
+# Расширенные функции логирования с подробной информацией
+
+# Global variables for timing and progress tracking
+SCRIPT_START_TIME=""
+FUNCTION_START_TIME=""
+CURRENT_STEP=""
+TOTAL_STEPS=10
+COMPLETED_STEPS=0
+
+log_system_info() {
+    log "=== СИСТЕМНАЯ ИНФОРМАЦИЯ ==="
+    log "Дата и время: $(date)"
+    log "Пользователь: $(whoami)"
+    log "UID: $(id -u)"
+    log "Рабочая директория: $(pwd)"
+    log "ОС: $(uname -a)"
+    log "Shell: $SHELL"
+    log "PATH: $PATH"
+    log "Переменные окружения:"
+    env | grep -E "(LANG|LC_|DEBIAN_FRONTEND|HOME|USER|PWD)" | while read line; do log "  $line"; done
+    log "=== КОНЕЦ СИСТЕМНОЙ ИНФОРМАЦИИ ==="
+}
+
+log_function_enter() {
+    local func_name="$1"
+    FUNCTION_START_TIME=$(date +%s)
+    log ">>> ВХОД В ФУНКЦИЮ: $func_name"
+    log "Время начала: $(date '+%Y-%m-%d %H:%M:%S')"
+}
+
+log_function_exit() {
+    local func_name="$1"
+    local exit_code="${2:-0}"
+    local end_time=$(date +%s)
+    local duration=$((end_time - FUNCTION_START_TIME))
+    log "<<< ВЫХОД ИЗ ФУНКЦИИ: $func_name"
+    log "Время выполнения: ${duration} сек"
+    log "Код выхода: $exit_code"
+    if [[ $exit_code -eq 0 ]]; then
+        ((COMPLETED_STEPS++))
+        log "Прогресс: $COMPLETED_STEPS/$TOTAL_STEPS шагов завершено"
+    fi
+}
+
+log_command_start() {
+    local cmd="$1"
+    log ">>> ИСПОЛНЕНИЕ КОМАНДЫ: $cmd"
+}
+
+log_command_end() {
+    local cmd="$1"
+    local exit_code="$2"
+    log "<<< КОМАНДА ЗАВЕРШЕНА: $cmd"
+    log "Код выхода команды: $exit_code"
+}
+
+log_step_start() {
+    local step_name="$1"
+    CURRENT_STEP="$step_name"
+    log "=== НАЧАЛО ШАГА: $step_name ==="
+    log "Общее время работы: $(( $(date +%s) - SCRIPT_START_TIME )) сек"
+}
+
+log_step_end() {
+    local step_name="$1"
+    log "=== ШАГ ЗАВЕРШЕН: $step_name ==="
+}
+
+log_debug() {
+    local msg="$1"
+    echo -e "${BLUE}[DEBUG] $msg${NC}"
+    echo "[DEBUG] $msg" >> "$LOG_FILE" 2>/dev/null || true
+}
+
 log() {
     local msg="$1"
     # Print colored output to stdout
@@ -46,8 +119,14 @@ log() {
 
 error() {
     local msg="$1"
+    local line_info="${BASH_LINENO[0]}"
+    local func_info="${FUNCNAME[1]}"
     echo -e "${RED}[ERROR] $msg${NC}"
-    echo "[ERROR] $msg" >> "$LOG_FILE" 2>/dev/null || true
+    echo "[ERROR] $msg (функция: $func_info, строка: $line_info)" >> "$LOG_FILE" 2>/dev/null || true
+    log "=== АВАРИЙНОЕ ЗАВЕРШЕНИЕ СКРИПТА ==="
+    log "Последний шаг: $CURRENT_STEP"
+    log "Выполненные шаги: $COMPLETED_STEPS/$TOTAL_STEPS"
+    log "Общее время работы: $(( $(date +%s) - SCRIPT_START_TIME )) сек"
     exit 1
 }
 
@@ -66,6 +145,8 @@ warning() {
 # Install wkhtmltopdf
 # Установить wkhtmltopdf
 install_wkhtmltopdf() {
+    log_function_enter "install_wkhtmltopdf"
+
     if [[ "$LANG" == "ru" ]]; then
         log "Установка wkhtmltopdf..."
         already_msg="wkhtmltopdf уже установлен"
@@ -76,6 +157,7 @@ install_wkhtmltopdf() {
 
     if command -v wkhtmltopdf &> /dev/null; then
         log "$already_msg"
+        log_function_exit "install_wkhtmltopdf" 0
         return
     fi
 
@@ -119,11 +201,14 @@ install_wkhtmltopdf() {
             warning "wkhtmltopdf installation failed, continuing without it"
         fi
     fi
+
+    log_function_exit "install_wkhtmltopdf" 0
 }
 
 # Verify versions
 # Проверить версии
 verify_versions() {
+    log_function_enter "verify_versions"
     if [[ "$LANG" == "ru" ]]; then
         log "Проверка установленных версий..."
         python_err="Требуется Python 3.10+"
@@ -164,6 +249,8 @@ PY
         mariadb_version=$(mariadb --version 2>/dev/null | sed -n 's/.*\([0-9]\+\.[0-9]\+\).*/\1/p' || true)
         log "MariaDB version: $mariadb_version ✓"
     fi
+
+    log_function_exit "verify_versions" 0
 }
 
 # Helper to execute MySQL/MariaDB SQL safely
@@ -892,6 +979,9 @@ configure_git() {
 # Main function
 # Главная функция
 main() {
+    SCRIPT_START_TIME=$(date +%s)
+    log_system_info
+
     # Select language
     select_language
 
@@ -903,7 +993,9 @@ main() {
         start_msg="ERPNext installation completed. Please check the summary file for next steps."
     fi
 
+    log_step_start "Проверка системных требований"
     check_root
+    log_step_end "Проверка системных требований"
 
     # Select installation path if not set via environment variable
     if [[ -z "$INSTALL_PATH" ]]; then
