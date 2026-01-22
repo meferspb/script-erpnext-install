@@ -825,6 +825,16 @@ main() {
     # Configure Git settings
     configure_git
 
+    # Prompt for site name if not set via environment variable
+    if [[ -z "$DEFAULT_SITE_NAME" || "$DEFAULT_SITE_NAME" == "site1.local" ]]; then
+        if [[ "$LANG" == "ru" ]]; then
+            read -p "Введите имя сайта (по умолчанию: site1.local): " user_site_name
+        else
+            read -p "Enter site name (default: site1.local): " user_site_name
+        fi
+        DEFAULT_SITE_NAME="${user_site_name:-site1.local}"
+    fi
+
     # Prompt for MariaDB root password with confirmation (allow user to override generated one)
     if [[ -z "$DB_ROOT_PASSWORD" ]]; then
         DB_ROOT_PASSWORD=""
