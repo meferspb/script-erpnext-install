@@ -252,6 +252,25 @@ install_system_deps() {
     # Run update first so package availability info is fresh
     sudo $UPDATE_CMD
 
+    # Ensure locales are present to avoid perl/apt-listchanges locale warnings
+    if [[ "$OS_FAMILY" == "debian" ]]; then
+        if [[ "$LANG" == "ru" ]]; then
+            if ! locale -a | grep -qi ru_RU; then
+                sudo $INSTALL_CMD locales || true
+                sudo sed -i 's/^# *ru_RU.UTF-8 UTF-8/ru_RU.UTF-8 UTF-8/' /etc/locale.gen || true
+                sudo locale-gen || true
+                sudo update-locale LANG=ru_RU.UTF-8 || true
+            fi
+        else
+            if ! locale -a | grep -qi en_US; then
+                sudo $INSTALL_CMD locales || true
+                sudo sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen || true
+                sudo locale-gen || true
+                sudo update-locale LANG=en_US.UTF-8 || true
+            fi
+        fi
+    fi
+
     case $OS_FAMILY in
         debian)
             # Ubuntu/Debian specific; check candidate availability and substitute if missing
@@ -313,9 +332,13 @@ install_system_deps() {
         debian)
             curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
             sudo $INSTALL_CMD nodejs
-            curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
-            echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
-            sudo $INSTALL_CMD yarn
+            # Add Yarn GPG key without using deprecated apt-key
+            if ! command -v gpg >/dev/null 2>&1; then
+                sudo $INSTALL_CMD gnupg dirmngr || true
+            fi
+            curl -fsSL https://dl.yarnpkg.com/debian/pubkey.gpg | sudo gpg --dearmor -o /usr/share/keyrings/yarn-archive-keyring.gpg || true
+            echo "deb [signed-by=/usr/share/keyrings/yarn-archive-keyring.gpg] https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+            sudo $INSTALL_CMD yarn || true
             ;;
         rhel)
             curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo -E bash -
