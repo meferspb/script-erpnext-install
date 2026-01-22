@@ -541,8 +541,12 @@ create_frappe_user() {
     # Add frappe to sudo or wheel group so bench can use sudo when needed
     if getent group sudo >/dev/null 2>&1; then
         sudo usermod -aG sudo frappe
+        # Allow passwordless sudo for frappe user
+        echo 'frappe ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/frappe >/dev/null
     else
         sudo usermod -aG wheel frappe
+        # For RHEL, allow passwordless sudo
+        echo 'frappe ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/frappe >/dev/null
     fi
 
     # Set up directories (quote paths)
