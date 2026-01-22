@@ -706,19 +706,54 @@ main() {
     # Configure Git settings
     configure_git
 
-    # Prompt for MariaDB root password (allow user to override generated one)
+    # Prompt for MariaDB root password with confirmation (allow user to override generated one)
     if [[ -z "$DB_ROOT_PASSWORD" ]]; then
         DB_ROOT_PASSWORD=""
     fi
-    if [[ "$LANG" == "ru" ]]; then
-        read -s -p "Введите пароль для пользователя root MariaDB (оставьте пустым для автогенерации): " input_db_root_pwd
-    else
-        read -s -p "Enter MariaDB root password (leave empty to generate): " input_db_root_pwd
-    fi
-    echo
-    if [[ -n "$input_db_root_pwd" ]]; then
-        DB_ROOT_PASSWORD="$input_db_root_pwd"
-    fi
+
+    attempts=0
+    while true; do
+        if [[ "$LANG" == "ru" ]]; then
+            read -s -p "Введите пароль для пользователя root MariaDB (оставьте пустым для автогенерации): " input_db_root_pwd
+        else
+            read -s -p "Enter MariaDB root password (leave empty to generate): " input_db_root_pwd
+        fi
+        echo
+
+        # If user left blank, keep generated/default
+        if [[ -z "$input_db_root_pwd" ]]; then
+            break
+        fi
+
+        if [[ "$LANG" == "ru" ]]; then
+            read -s -p "Подтвердите пароль: " input_db_root_pwd_confirm
+        else
+            read -s -p "Confirm password: " input_db_root_pwd_confirm
+        fi
+        echo
+
+        if [[ "$input_db_root_pwd" == "$input_db_root_pwd_confirm" ]]; then
+            DB_ROOT_PASSWORD="$input_db_root_pwd"
+            break
+        else
+            attempts=$((attempts+1))
+            if [[ "$LANG" == "ru" ]]; then
+                warning "Пароли не совпадают. Попробуйте снова."
+            else
+                warning "Passwords do not match. Try again."
+            fi
+            if [[ $attempts -ge 3 ]]; then
+                if [[ "$LANG" == "ru" ]]; then
+                    warning "Превышено число попыток подтверждения пароля. Используется автогенерированный пароль."
+                else
+                    warning "Password confirmation attempts exceeded. Using generated password."
+                fi
+                # Ensure DB_ROOT_PASSWORD has a value
+                DB_ROOT_PASSWORD="${DB_ROOT_PASSWORD:-$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 16)}"
+                break
+            fi
+        fi
+    done
 
     check_existing_installation
     detect_os
