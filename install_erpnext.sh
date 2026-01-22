@@ -375,8 +375,28 @@ install_system_deps() {
             if ! command -v gpg >/dev/null 2>&1; then
                 sudo $INSTALL_CMD gnupg dirmngr || true
             fi
-            curl -fsSL https://dl.yarnpkg.com/debian/pubkey.gpg | sudo gpg --dearmor -o /usr/share/keyrings/yarn-archive-keyring.gpg || true
-            echo "deb [signed-by=/usr/share/keyrings/yarn-archive-keyring.gpg] https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+
+            # Check if yarn keyring already exists and matches expected
+            local yarn_keyring="/usr/share/keyrings/yarn-archive-keyring.gpg"
+            local expected_keyring_content
+            expected_keyring_content=$(curl -fsSL https://dl.yarnpkg.com/debian/pubkey.gpg | gpg --dearmor 2>/dev/null || true)
+
+            if [[ -f "$yarn_keyring" ]]; then
+                local current_keyring_content
+                current_keyring_content=$(gpg --dearmor < "$yarn_keyring" 2>/dev/null || true)
+
+                if [[ "$current_keyring_content" == "$expected_keyring_content" ]]; then
+                    log "Yarn GPG keyring already exists and matches expected - skipping download"
+                else
+                    log "Yarn GPG keyring exists but differs - updating"
+                    echo "$expected_keyring_content" | sudo tee "$yarn_keyring" >/dev/null
+                fi
+            else
+                log "Downloading Yarn GPG keyring"
+                echo "$expected_keyring_content" | sudo tee "$yarn_keyring" >/dev/null
+            fi
+
+            echo "deb [signed-by=$yarn_keyring] https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
             sudo $INSTALL_CMD yarn || true
             ;;
         rhel)
