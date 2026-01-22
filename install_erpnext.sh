@@ -330,7 +330,7 @@ install_system_deps() {
     # Install Node.js 18+ and Yarn
     case $OS_FAMILY in
         debian)
-            curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+            curl -fsSL https://deb.nodesource.com/setup_2.x | sudo -E bash -
             sudo $INSTALL_CMD nodejs
             # Add Yarn GPG key without using deprecated apt-key
             if ! command -v gpg >/dev/null 2>&1; then
@@ -341,7 +341,7 @@ install_system_deps() {
             sudo $INSTALL_CMD yarn || true
             ;;
         rhel)
-            curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo -E bash -
+            curl -fsSL https://rpm.nodesource.com/setup_24.x | sudo -E bash -
             sudo $INSTALL_CMD nodejs
             curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | sudo tee /etc/yum.repos.d/yarn.repo
             sudo $INSTALL_CMD yarn
