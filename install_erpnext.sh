@@ -278,22 +278,35 @@ install_system_deps() {
     # Run update first so package availability info is fresh
     sudo $UPDATE_CMD
 
-    # Ensure locales are present to avoid perl/apt-listchanges locale warnings
+    # Install and configure locales
     if [[ "$OS_FAMILY" == "debian" ]]; then
+        sudo $INSTALL_CMD locales || true
+
+        # Generate required locales
+        local locales=("ru_RU.UTF-8 UTF-8" "en_US.UTF-8 UTF-8" "uz_UZ.UTF-8 UTF-8")
+
+        for locale_line in "${locales[@]}"; do
+            locale_name=$(echo "$locale_line" | cut -d' ' -f1)
+            if ! locale -a | grep -qi "^${locale_name%%.*}"; then
+                sudo sed -i "s/^# *${locale_line}/${locale_line}/" /etc/locale.gen || true
+            fi
+        done
+
+        sudo locale-gen || true
+
+        # Set default locale based on language preference
         if [[ "$LANG" == "ru" ]]; then
-            if ! locale -a | grep -qi ru_RU; then
-                sudo $INSTALL_CMD locales || true
-                sudo sed -i 's/^# *ru_RU.UTF-8 UTF-8/ru_RU.UTF-8 UTF-8/' /etc/locale.gen || true
-                sudo locale-gen || true
-                sudo update-locale LANG=ru_RU.UTF-8 || true
-            fi
+            sudo update-locale LANG=ru_RU.UTF-8 || true
         else
-            if ! locale -a | grep -qi en_US; then
-                sudo $INSTALL_CMD locales || true
-                sudo sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen || true
-                sudo locale-gen || true
-                sudo update-locale LANG=en_US.UTF-8 || true
-            fi
+            sudo update-locale LANG=en_US.UTF-8 || true
+        fi
+    elif [[ "$OS_FAMILY" == "rhel" ]]; then
+        # For RHEL systems, locales are usually available by default
+        # but we can ensure UTF-8 support
+        if command -v localedef &> /dev/null; then
+            sudo localedef -c -i ru_RU -f UTF-8 ru_RU.UTF-8 || true
+            sudo localedef -c -i en_US -f UTF-8 en_US.UTF-8 || true
+            sudo localedef -c -i uz_UZ -f UTF-8 uz_UZ.UTF-8 || true
         fi
     fi
 
