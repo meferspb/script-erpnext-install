@@ -180,6 +180,8 @@ detect_os() {
                 PKG_MANAGER="apt"
                 UPDATE_CMD="apt update"
                 INSTALL_CMD="apt install -y"
+                REMOVE_CMD="apt remove -y"
+                PURGE_CMD="apt-get purge -y"
                 ;;
             rhel|centos|ol|rocky|almalinux)
                 OS_FAMILY="rhel"
@@ -187,10 +189,14 @@ detect_os() {
                     PKG_MANAGER="dnf"
                     UPDATE_CMD="dnf update -y"
                     INSTALL_CMD="dnf install -y"
+                    REMOVE_CMD="dnf remove -y"
+                    PURGE_CMD="dnf remove -y"
                 else
                     PKG_MANAGER="yum"
                     UPDATE_CMD="yum update -y"
                     INSTALL_CMD="yum install -y"
+                    REMOVE_CMD="yum remove -y"
+                    PURGE_CMD="yum remove -y"
                 fi
                 ;;
             *)
@@ -451,13 +457,17 @@ configure_mariadb() {
         case $OS_FAMILY in
             debian)
                 sudo systemctl stop mariadb || sudo systemctl stop mysql || true
-                sudo $INSTALL_CMD --purge -y mariadb-server mariadb-client mariadb-common mariadb-server-core-* mariadb-client-core-* mysql-server mysql-client mysql-common || true
+                # Use purge command variable to properly purge packages if present
+                sudo $PURGE_CMD mariadb-server mariadb-client mariadb-common mariadb-server-core-* mariadb-client-core-* 2>/dev/null || true
+                # Try to purge mysql packages only if present in apt cache
+                if apt-cache policy mysql-server >/dev/null 2>&1; then
+                    sudo $PURGE_CMD mysql-server mysql-client mysql-common 2>/dev/null || true
+                fi
                 sudo apt autoremove -y || true
                 ;;
             rhel)
                 sudo systemctl stop mariadb || sudo systemctl stop mysql || true
-                sudo $INSTALL_CMD remove -y mariadb-server mariadb mariadb-client mysql-server mysql || true
-                sudo $INSTALL_CMD autoremove -y || true
+                sudo $REMOVE_CMD mariadb-server mariadb mariadb-client mysql-server mysql 2>/dev/null || true
                 ;;
         esac
 
@@ -479,8 +489,17 @@ configure_mariadb() {
     sudo systemctl start mariadb || sudo systemctl start mysql || true
     sudo systemctl enable mariadb || sudo systemctl enable mysql || true
 
-    # Wait for MariaDB to start
+    # Wait for MariaDB to start and verify
     sleep 5
+    if ! sudo systemctl is-active --quiet mariadb && ! sudo systemctl is-active --quiet mysql; then
+        warning "MariaDB service failed to start. Collecting recent journal logs to /tmp/mariadb_journal.log"
+        sudo journalctl -xeu mariadb.service -n 200 > /tmp/mariadb_journal.log 2>/dev/null || true
+        if [[ "$LANG" == "ru" ]]; then
+            error "Сервис MariaDB не запущен. Проверьте /tmp/mariadb_journal.log или выполните 'sudo systemctl status mariadb.service' для подробностей."
+        else
+            error "MariaDB service is not running. Check /tmp/mariadb_journal.log or run 'sudo systemctl status mariadb.service' for details."
+        fi
+    fi
 
     # Secure MariaDB installation manually (try multiple auth methods)
     if run_mysql "ALTER USER 'root'@'localhost' IDENTIFIED BY '${DB_ROOT_PASSWORD}'; DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1'); DELETE FROM mysql.user WHERE User=''; DELETE FROM mysql.db WHERE Db='test' OR Db LIKE 'test_%'; FLUSH PRIVILEGES;"; then
