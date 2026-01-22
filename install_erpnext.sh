@@ -727,6 +727,15 @@ main() {
         INSTALL_PATH="${user_path:-/opt/frappe}"
     fi
 
+    # Check if installation path is under /home and warn about permission issues
+    if [[ "$INSTALL_PATH" == /home/* ]]; then
+        if [[ "$LANG" == "ru" ]]; then
+            warning "Путь установки находится в /home. Это может вызвать проблемы с разрешениями для пользователя frappe. Рекомендуется использовать /opt/frappe."
+        else
+            warning "Installation path is under /home. This may cause permission issues for the frappe user. It is recommended to use /opt/frappe."
+        fi
+    fi
+
     # Configure Git settings
     configure_git
 
