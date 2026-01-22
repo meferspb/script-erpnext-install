@@ -595,8 +595,13 @@ install_erpnext() {
     sudo -u frappe bash -c "cd '$INSTALL_PATH/frappe-bench' && \
         bench get-app erpnext --branch '$DEFAULT_ERP_VERSION' && \
         bench new-site '$DEFAULT_SITE_NAME' --admin-password '$DEFAULT_ADMIN_PASSWORD' --db-password '${DB_PASSWORD}' && \
-        bench --site '$DEFAULT_SITE_NAME' install-app erpnext && \
-        bench setup production frappe"
+        bench --site '$DEFAULT_SITE_NAME' install-app erpnext"
+
+    # Ensure Redis is running before production setup
+    sudo systemctl restart redis-server || true
+    sleep 2
+
+    sudo -u frappe bash -c "cd '$INSTALL_PATH/frappe-bench' && bench setup production frappe"
 
     success "$success_msg"
 }
