@@ -576,7 +576,7 @@ install_bench() {
     else
         sudo pip3 install --break-system-packages --ignore-installed frappe-bench
     fi
-    sudo -u frappe bash -c "cd '$INSTALL_PATH' && bench init --frappe-branch '$DEFAULT_FRAPPE_BRANCH' frappe-bench && cd frappe-bench && bench setup production frappe"
+    sudo -u frappe bash -c "cd '$INSTALL_PATH' && rm -rf frappe-bench && bench init --frappe-branch '$DEFAULT_FRAPPE_BRANCH' frappe-bench && cd frappe-bench && bench setup production frappe"
 
     success "$success_msg"
 }
