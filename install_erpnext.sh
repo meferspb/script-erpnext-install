@@ -248,11 +248,46 @@ install_system_deps() {
     # Common packages
     local common_packages="git curl wget python3 python3-pip python3-dev python3-setuptools python3-venv redis-server mariadb-server nginx supervisor build-essential libssl-dev libffi-dev bc bmon mc htop vim nano screen rsync unzip"
 
-    # OS-specific packages
+    # OS-specific packages — handle missing packages on newer distributions
+    # Run update first so package availability info is fresh
+    sudo $UPDATE_CMD
+
     case $OS_FAMILY in
         debian)
-            # Ubuntu/Debian specific
-            local os_packages="software-properties-common python3-distutils libmysqlclient-dev"
+            # Ubuntu/Debian specific base list; we'll check availability and substitute
+            local os_packages_base=(software-properties-common python3-distutils libmysqlclient-dev)
+            local os_packages_arr=()
+            for pkg in "${os_packages_base[@]}"; do
+                if apt-cache show "$pkg" >/dev/null 2>&1; then
+                    os_packages_arr+=("$pkg")
+                else
+                    case $pkg in
+                        libmysqlclient-dev)
+                            if apt-cache show default-libmysqlclient-dev >/dev/null 2>&1; then
+                                os_packages_arr+=("default-libmysqlclient-dev")
+                            else
+                                os_packages_arr+=("libmariadb-dev-compat" "libmariadb-dev")
+                            fi
+                            ;;
+                        python3-distutils)
+                            if apt-cache show python3.10-distutils >/dev/null 2>&1; then
+                                os_packages_arr+=("python3.10-distutils")
+                            else
+                                warning "Package python3-distutils not found, adding python3-venv and python3-setuptools as fallback"
+                                os_packages_arr+=("python3-venv" "python3-setuptools")
+                            fi
+                            ;;
+                        software-properties-common)
+                            warning "Package software-properties-common not found; skipping add-apt-repository support"
+                            ;;
+                        *)
+                            warning "Package $pkg not found; skipping"
+                            ;;
+                    esac
+                fi
+            done
+            # Join array into a space-separated string for apt
+            local os_packages="${os_packages_arr[*]}"
             ;;
         rhel)
             # RHEL/OEL specific
@@ -265,7 +300,6 @@ install_system_deps() {
     esac
 
     # Install all packages
-    sudo $UPDATE_CMD
     sudo $INSTALL_CMD $common_packages $os_packages
 
     # Install Node.js 18+ and Yarn
