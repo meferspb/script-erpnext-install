@@ -296,6 +296,13 @@ install_system_deps() {
             log "Fixing interrupted dpkg operations..."
             sudo dpkg --configure -a || true
         fi
+
+        # Clean up any problematic wkhtmltox installations
+        if dpkg -l | grep -q "^[a-zA-Z].*wkhtmltox"; then
+            log "Removing conflicting wkhtmltox package..."
+            sudo dpkg --purge --force-depends wkhtmltox || true
+            sudo apt autoremove -y || true
+        fi
     fi
 
     # Install and configure locales
