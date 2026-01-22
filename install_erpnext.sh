@@ -706,6 +706,20 @@ main() {
     # Configure Git settings
     configure_git
 
+    # Prompt for MariaDB root password (allow user to override generated one)
+    if [[ -z "$DB_ROOT_PASSWORD" ]]; then
+        DB_ROOT_PASSWORD=""
+    fi
+    if [[ "$LANG" == "ru" ]]; then
+        read -s -p "Введите пароль для пользователя root MariaDB (оставьте пустым для автогенерации): " input_db_root_pwd
+    else
+        read -s -p "Enter MariaDB root password (leave empty to generate): " input_db_root_pwd
+    fi
+    echo
+    if [[ -n "$input_db_root_pwd" ]]; then
+        DB_ROOT_PASSWORD="$input_db_root_pwd"
+    fi
+
     check_existing_installation
     detect_os
     install_system_deps
