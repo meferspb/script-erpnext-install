@@ -278,6 +278,14 @@ install_system_deps() {
     # Run update first so package availability info is fresh
     sudo $UPDATE_CMD
 
+    # Fix any interrupted dpkg operations first
+    if [[ "$OS_FAMILY" == "debian" ]]; then
+        if sudo dpkg --configure -a --status-fd 1 2>/dev/null | grep -q "half-configured\|unpacked\|half-installed"; then
+            log "Fixing interrupted dpkg operations..."
+            sudo dpkg --configure -a || true
+        fi
+    fi
+
     # Install and configure locales
     if [[ "$OS_FAMILY" == "debian" ]]; then
         sudo $INSTALL_CMD locales || true
