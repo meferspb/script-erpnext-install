@@ -254,37 +254,43 @@ install_system_deps() {
 
     case $OS_FAMILY in
         debian)
-            # Ubuntu/Debian specific base list; we'll check availability and substitute
+            # Ubuntu/Debian specific; check candidate availability and substitute if missing
             local os_packages_base=(software-properties-common python3-distutils libmysqlclient-dev)
             local os_packages_arr=()
             for pkg in "${os_packages_base[@]}"; do
-                if apt-cache show "$pkg" >/dev/null 2>&1; then
+                candidate=$(apt-cache policy "$pkg" 2>/dev/null | awk '/Candidate:/ {print $2}') || candidate=""
+                if [[ -n "$candidate" && "$candidate" != "(none)" ]]; then
                     os_packages_arr+=("$pkg")
-                else
-                    case $pkg in
-                        libmysqlclient-dev)
-                            if apt-cache show default-libmysqlclient-dev >/dev/null 2>&1; then
-                                os_packages_arr+=("default-libmysqlclient-dev")
-                            else
-                                os_packages_arr+=("libmariadb-dev-compat" "libmariadb-dev")
-                            fi
-                            ;;
-                        python3-distutils)
-                            if apt-cache show python3.10-distutils >/dev/null 2>&1; then
-                                os_packages_arr+=("python3.10-distutils")
-                            else
-                                warning "Package python3-distutils not found, adding python3-venv and python3-setuptools as fallback"
-                                os_packages_arr+=("python3-venv" "python3-setuptools")
-                            fi
-                            ;;
-                        software-properties-common)
-                            warning "Package software-properties-common not found; skipping add-apt-repository support"
-                            ;;
-                        *)
-                            warning "Package $pkg not found; skipping"
-                            ;;
-                    esac
+                    continue
                 fi
+
+                case $pkg in
+                    libmysqlclient-dev)
+                        # prefer default-libmysqlclient-dev, otherwise libmariadb dev packages
+                        candidate=$(apt-cache policy default-libmysqlclient-dev 2>/dev/null | awk '/Candidate:/ {print $2}') || candidate=""
+                        if [[ -n "$candidate" && "$candidate" != "(none)" ]]; then
+                            os_packages_arr+=("default-libmysqlclient-dev")
+                        else
+                            os_packages_arr+=("libmariadb-dev-compat" "libmariadb-dev")
+                        fi
+                        ;;
+                    python3-distutils)
+                        # Try to find a versioned distutils package (e.g., python3.11-distutils)
+                        alt_pkg=$(apt-cache search --names-only '^python3[0-9\.]*-distutils$' 2>/dev/null | awk '{print $1; exit}') || alt_pkg=""
+                        if [[ -n "$alt_pkg" ]]; then
+                            os_packages_arr+=("$alt_pkg")
+                        else
+                            warning "Package python3-distutils not found; adding python3-venv and python3-setuptools as fallback"
+                            os_packages_arr+=("python3-venv" "python3-setuptools")
+                        fi
+                        ;;
+                    software-properties-common)
+                        warning "Package software-properties-common not found; skipping add-apt-repository support"
+                        ;;
+                    *)
+                        warning "Package $pkg not found; skipping"
+                        ;;
+                esac
             done
             # Join array into a space-separated string for apt
             local os_packages="${os_packages_arr[*]}"
