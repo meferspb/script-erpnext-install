@@ -417,7 +417,7 @@ install_system_deps() {
         fi
     fi
 
-    # Install and configure locales
+    # Install and configure locales properly
     if [[ "$OS_FAMILY" == "debian" ]]; then
         sudo $INSTALL_CMD locales || true
 
@@ -433,11 +433,24 @@ install_system_deps() {
 
         sudo locale-gen || true
 
-        # Set default locale based on language preference
+        # Set all locale variables properly
         if [[ "$LANG" == "ru" ]]; then
-            sudo update-locale LANG=ru_RU.UTF-8 || true
+            sudo update-locale LANG=ru_RU.UTF-8 LC_ALL=ru_RU.UTF-8 LC_CTYPE=ru_RU.UTF-8 LC_MESSAGES=ru_RU.UTF-8 || true
         else
-            sudo update-locale LANG=en_US.UTF-8 || true
+            sudo update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 LC_CTYPE=en_US.UTF-8 LC_MESSAGES=en_US.UTF-8 || true
+        fi
+
+        # Export locale variables for current session
+        if [[ "$LANG" == "ru" ]]; then
+            export LANG=ru_RU.UTF-8
+            export LC_ALL=ru_RU.UTF-8
+            export LC_CTYPE=ru_RU.UTF-8
+            export LC_MESSAGES=ru_RU.UTF-8
+        else
+            export LANG=en_US.UTF-8
+            export LC_ALL=en_US.UTF-8
+            export LC_CTYPE=en_US.UTF-8
+            export LC_MESSAGES=en_US.UTF-8
         fi
     elif [[ "$OS_FAMILY" == "rhel" ]]; then
         # For RHEL systems, locales are usually available by default
@@ -710,13 +723,20 @@ create_frappe_user() {
         sudo useradd -m -s /bin/bash frappe
     fi
 
+    # Create frappe group if it doesn't exist and add frappe user to it
+    if ! getent group frappe >/dev/null 2>&1; then
+        sudo groupadd frappe || true
+    fi
+
     # Add frappe to sudo or wheel group so bench can use sudo when needed
     if getent group sudo >/dev/null 2>&1; then
         sudo usermod -aG sudo frappe
+        sudo usermod -aG frappe frappe
         # Allow passwordless sudo for frappe user
         echo 'frappe ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/frappe >/dev/null
     else
         sudo usermod -aG wheel frappe
+        sudo usermod -aG frappe frappe
         # For RHEL, allow passwordless sudo
         echo 'frappe ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/frappe >/dev/null
     fi
