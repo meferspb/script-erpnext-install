@@ -287,6 +287,31 @@ install_system_deps() {
     local common_packages="git curl wget python3 python3-pip python3-dev python3-setuptools python3-venv redis-server mariadb-server nginx supervisor cron build-essential libssl-dev libffi-dev bc bmon mc htop vim nano screen rsync unzip"
 
     # OS-specific packages — handle missing packages on newer distributions
+    # Ensure Debian repositories are properly configured
+    if [[ "$OS_FAMILY" == "debian" ]]; then
+        # Check and enable required Debian repositories
+        local sources_file="/etc/apt/sources.list"
+        if [[ -f "$sources_file" ]]; then
+            # Check if main, contrib, non-free, non-free-firmware are enabled
+            local has_main=$(grep -q "deb.*main" "$sources_file" && echo "yes" || echo "no")
+            local has_contrib=$(grep -q "deb.*contrib" "$sources_file" && echo "yes" || echo "no")
+            local has_nonfree=$(grep -q "deb.*non-free[^-]" "$sources_file" && echo "yes" || echo "no")
+            local has_nonfree_firmware=$(grep -q "deb.*non-free-firmware" "$sources_file" && echo "yes" || echo "no")
+
+            if [[ "$has_main" == "no" || "$has_contrib" == "no" || "$has_nonfree" == "no" || "$has_nonfree_firmware" == "no" ]]; then
+                log "Enabling required Debian repositories (main, contrib, non-free, non-free-firmware)..."
+                # Backup original sources.list
+                sudo cp "$sources_file" "${sources_file}.backup"
+
+                # Enable required components in existing deb lines
+                sudo sed -i 's/deb http/deb http/g; s/deb http/deb http/g' "$sources_file"
+                sudo sed -i 's/deb http\([^ ]*\) \([^ ]*\) \([^ ]*\)$/deb http\1 \2 \3 main contrib non-free non-free-firmware/g' "$sources_file"
+
+                log "Debian repositories updated. Updating package cache..."
+            fi
+        fi
+    fi
+
     # Run update first so package availability info is fresh
     sudo $UPDATE_CMD
 
