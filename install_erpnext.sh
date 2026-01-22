@@ -21,8 +21,8 @@ NC='\033[0m' # No Color
 # Конфигурация по умолчанию (может быть переопределена переменными окружения)
 DEFAULT_SITE_NAME="${SITE_NAME:-site1.local}"
 DEFAULT_ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin}"
-DEFAULT_ERP_VERSION="${ERP_VERSION:-v15}"
-DEFAULT_FRAPPE_BRANCH="${FRAPPE_BRANCH:-v15}"
+DEFAULT_ERP_VERSION="${ERP_VERSION:-version-15}"
+DEFAULT_FRAPPE_BRANCH="${FRAPPE_BRANCH:-version-15}"
 INSTALL_PATH="${INSTALL_PATH:-}"
 INSTALL_MODE="${INSTALL_MODE:-production}"  # production or development
 # Default log file — place in user's home by default to avoid permission errors
